@@ -127,6 +127,12 @@ button.cal-d:hover{filter:brightness(.95)}
 .bar{display:block;height:10px;border-radius:6px;background:var(--soft);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--h4);border-radius:6px} .bar.low i{background:var(--no)}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
+.restart-card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.btn.danger{color:var(--no);border-color:color-mix(in srgb,var(--no) 40%,var(--line))}
+.btn.danger-fill{background:var(--no);border-color:var(--no);color:#fff}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.rs-box{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.6}
+.rs-list{margin:12px 0 0;padding-left:18px;font-size:14px;line-height:1.6}.rs-list li{margin:4px 0}
 .scope-btns{display:flex;gap:8px;flex-wrap:wrap}
 .sbtn{flex:1 1 0;min-width:0;white-space:nowrap;padding:12px 6px;letter-spacing:-.2px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--muted);font:inherit;font-size:15px;font-weight:700;cursor:pointer}
 .sbtn.on{background:var(--brand);border-color:var(--brand);color:#fff}
@@ -254,9 +260,9 @@ window.MathJax = { tex: { inlineMath: [["$", "$"]], displayMath: [["$$", "$$"]] 
    - claude.ai 아티팩트에서 열면 claude.ai 계정으로 저장됩니다.
    - 둘 다 아니면 이 브라우저에만 저장됩니다.
    ====================================================================== */
-const APP_VERSION = "2026.10.16-3";
+const APP_VERSION = "2026.10.16-5";
 const CONFIG = {
-  startDate: "2026-10-15",   // 1일차 날짜 (모든 학생 공통)
+  startDate: "2026-10-15",   // (예전 방식 기록용) 이제 1일차는 학생마다 처음 시작한 날이에요
   totalDays: 365,
   allowedDomain: "gimpojeil.hs.kr",         // 학교 계정만 허용하려면 예: "school.ac.kr"
   firebase: {
@@ -277,7 +283,7 @@ const CIRC = ["①", "②", "③", "④", "⑤"];
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 const $app = document.getElementById("app");
 const S = { be: null, user: null, rec: { days: {} }, weeks: {}, concepts: null, view: "home", arg: null, calMonth: null, sess: null };
-const START = parseYmd(CONFIG.startDate), TOTAL = CONFIG.totalDays;
+let START = parseYmd(CONFIG.startDate); const TOTAL = CONFIG.totalDays;   // START 는 로그인 후 학생별 시작일로 바뀐다
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function pad(n, w = 2) { return String(n).padStart(w, "0"); }
@@ -371,6 +377,8 @@ function localBackend(uid, name = "", note = "이 브라우저에만 저장돼�
     async load() { return lsGet(K + "rec", { days: {} }); },
     async saveDay(dk, d) { const r = lsGet(K + "rec", { days: {} }); r.days[dk] = d; lsSet(K + "rec", r); },
     async saveSel(sel) { const r = lsGet(K + "rec", { days: {} }); r.sel = sel; lsSet(K + "rec", r); },
+    async saveStart(start) { const r = lsGet(K + "rec", { days: {} }); r.start = start; lsSet(K + "rec", r); },
+    async resetAll(start) { const r = lsGet(K + "rec", { days: {} }); lsSet(K + "rec", { days: {}, sel: r.sel, start }); },
     async getMemo(dk) { return lsGet(K + "memo" + dk, {}); },
     async saveMemo(dk, m) { lsSet(K + "memo" + dk, m); },
     signOut() {},
@@ -393,10 +401,12 @@ async function artifactBackend(db) {
     },
     async saveDay(dk, d) {
       if (fallback) return fallback.saveDay(dk, d);
-      try { await db.doc(`${base}/summary`).set({ days: { ...S.rec.days, [dk]: d }, sel: S.sel || null }); }
+      try { await db.doc(`${base}/summary`).set({ days: { ...S.rec.days, [dk]: d }, sel: S.sel || null, start: S.rec.start || null }); }
       catch (e) { fallback = localBackend(uid, me.name); be.note = "공유 권한이 보기 전용이라 기록을 이 브라우저에만 저장해요."; await fallback.saveDay(dk, d); render(); }
     },
-    async saveSel(sel) { if (fallback) return fallback.saveSel(sel); try { await db.doc(`${base}/summary`).set({ days: S.rec.days, sel }); } catch { lsSet(`mathson_${uid}_sel`, sel); } },
+    async saveSel(sel) { if (fallback) return fallback.saveSel(sel); try { await db.doc(`${base}/summary`).set({ days: S.rec.days, sel, start: S.rec.start || null }); } catch { lsSet(`mathson_${uid}_sel`, sel); } },
+    async saveStart(start) { if (fallback) return fallback.saveStart(start); try { await db.doc(`${base}/summary`).set({ days: S.rec.days, sel: S.sel || null, start }); } catch { lsSet(`mathson_${uid}_start`, start); } },
+    async resetAll(start) { lsSet(`mathson_${uid}_rec`, { days: {} }); if (fallback) return fallback.resetAll(start); await db.doc(`${base}/summary`).set({ days: {}, sel: S.sel || null, start }); },
     async getMemo(dk) { if (fallback) return fallback.getMemo(dk); const s = await db.doc(`${base}/m${dk}`).get().catch(() => null); return s && s.exists ? s.data() : lsGet(`mathson_${uid}_memo${dk}`, {}); },
     async saveMemo(dk, m) { if (fallback) return fallback.saveMemo(dk, m); try { await db.doc(`${base}/m${dk}`).set(m); } catch { fallback = localBackend(uid, me.name); await fallback.saveMemo(dk, m); } },
     signOut() {},
@@ -447,6 +457,8 @@ async function firebaseBackend() {
     async load() { if (cached) { const c = cached; cached = null; return { days: {}, ...c }; } const s = await F.getDoc(F.doc(db, "users", u.uid)); return s.exists() ? { days: {}, ...s.data() } : { days: {} }; },
     async saveDay(dk, d) { await F.setDoc(F.doc(db, "users", u.uid), { days: { [dk]: d }, name: u.displayName || "", updatedAt: Date.now() }, { merge: true }); },
     async saveSel(sel) { await F.setDoc(F.doc(db, "users", u.uid), { sel }, { merge: true }); },
+    async saveStart(start) { await F.setDoc(F.doc(db, "users", u.uid), { start }, { merge: true }); },
+    async resetAll(start) { await F.updateDoc(F.doc(db, "users", u.uid), { days: {}, start, resetAt: Date.now() }); },   // days 를 통째로 비운다
     async getMemo(dk) { const s = await F.getDoc(F.doc(db, "users", u.uid, "memos", dk)); return s.exists() ? s.data() : {}; },
     async saveMemo(dk, m) { await F.setDoc(F.doc(db, "users", u.uid, "memos", dk), m); },
   };
@@ -459,6 +471,16 @@ async function boot() {
   S.user = S.be.user;
   $app.innerHTML = `<div class="center muted">내 학습 기록을 불러오는 중…</div>`;
   try { S.rec = await S.be.load(); if (!S.rec.days) S.rec.days = {}; } catch (e) { console.error(e); S.rec = { days: {} }; toast("기록을 불러오지 못해 새로 시작해요."); }
+  // 1일차 = 이 학생이 처음 시작한 날 (기록에 저장해 두고 어느 기기에서든 같게)
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const okYmd = (x) => typeof x === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x);
+  if (!okYmd(S.rec.start)) {
+    const local = lsGet(`mathson_${S.user.uid}_start`, null);
+    S.rec.start = okYmd(local) ? local : Object.keys(S.rec.days).length ? CONFIG.startDate : ymd(new Date());
+    lsSet(`mathson_${S.user.uid}_start`, S.rec.start);
+    try { await S.be.saveStart(S.rec.start); } catch { }
+  }
+  START = parseYmd(S.rec.start);
   const okSel = (x) => Array.isArray(x) && x.length && x.every((u) => UNITS.includes(u));
   S.sel = okSel(S.rec.sel) ? S.rec.sel : okSel(lsGet(`mathson_${S.user.uid}_sel`, null)) ? lsGet(`mathson_${S.user.uid}_sel`, null) : ["대수", "미적분I"];
   document.addEventListener("click", onGlobalClick);
@@ -568,7 +590,7 @@ function viewHome() {
   if (!S.calMonth) { const d = tn < 1 ? new Date(START) : tn > TOTAL ? dateOfDay(TOTAL) : new Date(); S.calMonth = new Date(d.getFullYear(), d.getMonth(), 1); }
   let today;
   if (tn < 1) today = `<div class="today"><div class="eyebrow">시작까지</div><div class="big">D-${1 - tn}</div><div class="sub">${fmtDate(START)}부터 1일차가 시작돼요.</div></div>`;
-  else if (tn > TOTAL) today = `<div class="today done"><div class="eyebrow">365일 과정 완주 기간이 끝났어요</div><div class="big">${st.done}일 학습</div><div class="sub">달력에서 지난 날을 다시 볼 수 있어요.</div></div>`;
+  else if (tn > TOTAL) today = `<div class="today done"><div class="eyebrow">365일 과정 완주 기간이 끝났어요</div><div class="big">${st.done}일 학습</div><div class="sub">달력에서 지난 날을 다시 볼 수 있어요. 아래 '1일차로 다시 시작'으로 새 365일을 시작할 수도 있어요.</div></div>`;
   else {
     const r = S.rec.days[dayKey(tn)];
     const stage = !r ? 0 : r.finished ? 3 : 2;
@@ -600,10 +622,48 @@ function viewHome() {
       <div class="chips">${missed.slice(-10).reverse().map((n) => `<button class="chip" data-go="solve:${n}">Day ${n}</button>`).join("") || `<span class="muted small">빠짐없이 풀었어요</span>`}</div>
       <div class="card-h" style="margin-top:16px"><h3>오답 노트</h3><button class="btn ghost sm" data-go="wrong">${st.wrong}문항 보기</button></div></section>
   </div>
-  <section class="card"><div class="card-h"><h3>365일 기록</h3><span class="muted small">칸 하나가 하루예요</span></div>${yearHeatmap()}</section></main>`;
+  <section class="card"><div class="card-h"><h3>365일 기록</h3><span class="muted small">칸 하나가 하루예요</span></div>${yearHeatmap()}</section>
+  <section class="card restart-card"><div><b>처음부터 다시 시작하기</b><div class="muted small">나의 1일차: ${fmtDate(START)} · 오늘은 Day ${Math.max(1, Math.min(tn, TOTAL))}${tn > TOTAL ? " (완주)" : ""}</div></div>
+    <button class="btn ghost sm danger" id="restartBtn">1일차로 다시 시작</button></section></main>`;
   bindTop();
+  document.getElementById("restartBtn").onclick = askRestart;
   const shift = (k) => { const m = new Date(S.calMonth.getFullYear(), S.calMonth.getMonth() + k, 1), f = new Date(START.getFullYear(), START.getMonth(), 1), l = dateOfDay(TOTAL); if (m < f || m > new Date(l.getFullYear(), l.getMonth(), 1)) return; S.calMonth = m; viewHome(); };
   document.getElementById("cp").onclick = () => shift(-1); document.getElementById("cn").onclick = () => shift(1);
+}
+
+
+/* ============================== 처음부터 다시 시작 ============================== */
+function askRestart() {
+  const tn = todayNo(), st = myStats();
+  const bg = document.createElement("div"); bg.className = "modal-bg";
+  bg.innerHTML = `<div class="modal restart-modal" role="dialog" aria-modal="true" aria-labelledby="rsTitle">
+    <h3 id="rsTitle">처음부터 다시 시작할까요?</h3>
+    <p class="muted" style="margin:0 0 10px">오늘(${fmtDate(new Date())})이 새로운 <b>1일차</b>가 되고, 그날부터 다시 365일 동안 하루 7문제를 풀어요.</p>
+    <div class="rs-box"><b>지금까지의 기록</b><br>시작일 ${fmtDate(START)} · ${st.done}일 학습 · ${st.q}문항 중 ${st.c}문항 정답 (정답률 ${pct(st.c, st.q)}%)</div>
+    <ul class="rs-list">
+      <li><b>모두 지워져요:</b> 달력의 색칠과 ★, 정답률·과목별 분석, 연속 학습 일수, 안 푼 날 목록, 오답 노트</li>
+      <li><b>되돌릴 수 없어요.</b> 지운 기록은 선생님도 복구할 수 없어요.</li>
+      <li><b>그대로 남아요:</b> 로그인한 계정, 고른 출제 범위</li>
+      <li><b>문제는</b> 1일차 문제부터 다시 나와요. 출제 범위가 예전과 같으면 전에 풀었던 문제가 다시 나올 수 있어요. 복습으로 활용해 보세요.</li>
+      <li>다른 기기에서도 똑같이 새로 시작한 상태로 보여요.</li>
+    </ul>
+    <label for="rsInput" class="small" style="display:block;margin:12px 0 6px">정말 다시 시작하려면 아래 칸에 <b>다시 시작</b> 이라고 입력하세요.</label>
+    <input id="rsInput" type="text" autocomplete="off" placeholder="다시 시작" style="width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font:inherit;font-size:16px;background:var(--card);color:var(--fg)">
+    <div class="modal-actions"><button class="btn ghost" data-a="no">취소</button><button class="btn primary danger-fill" data-a="yes" disabled>기록 지우고 1일차로</button></div></div>`;
+  document.body.appendChild(bg);
+  const inp = bg.querySelector("#rsInput"), yes = bg.querySelector('[data-a="yes"]');
+  inp.oninput = () => { yes.disabled = inp.value.replace(/\s+/g, " ").trim() !== "다시 시작"; };
+  bg.querySelector('[data-a="no"]').onclick = () => bg.remove();
+  yes.onclick = async () => { yes.disabled = true; yes.textContent = "지우는 중…"; try { await doRestart(); bg.remove(); toast("새로운 1일차가 시작됐어요. 오늘부터 다시 꾸준히!"); } catch (e) { yes.disabled = false; yes.textContent = "기록 지우고 1일차로"; toast("다시 시작하지 못했어요. 인터넷 연결을 확인해 주세요."); } };
+  setTimeout(() => inp.focus(), 50);
+}
+async function doRestart() {
+  const d = new Date(), start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  await S.be.resetAll(start);
+  try { Object.keys(localStorage).filter((k) => k.startsWith(`mathson_sess_${S.user.uid}_`) || k === `mathson_${S.user.uid}_rec`).forEach((k) => localStorage.removeItem(k)); } catch { }
+  lsSet(`mathson_${S.user.uid}_start`, start);
+  S.rec.days = {}; S.rec.start = start; START = parseYmd(start); S.calMonth = null; S.weeks = S.weeks || {};
+  go("home");
 }
 
 /* ============================== 문제지 ============================== */
