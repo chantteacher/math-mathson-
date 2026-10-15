@@ -257,8 +257,15 @@ window.MathJax = { tex: { inlineMath: [["$", "$"]], displayMath: [["$$", "$$"]] 
 const CONFIG = {
   startDate: "2026-10-15",   // 1일차 날짜 (모든 학생 공통)
   totalDays: 365,
-  allowedDomain: "",         // 학교 계정만 허용하려면 예: "school.ac.kr"
-  firebase: { apiKey: "", authDomain: "", projectId: "", storageBucket: "", messagingSenderId: "", appId: "" },
+  allowedDomain: "gimpojeil.hs.kr",         // 학교 계정만 허용하려면 예: "school.ac.kr"
+  firebase: {
+    apiKey: "AIzaSyCSCexeMFAMrGFaMY_p3ieYLC2GoNGbTt0",
+    authDomain: "mathson-2b2ac.firebaseapp.com",
+    projectId: "mathson-2b2ac",
+    storageBucket: "mathson-2b2ac.firebasestorage.app",
+    messagingSenderId: "400007726468",
+    appId: "1:400007726468:web:d018459b41964b45c589d1",
+  },
 };
 
 /* ============================== 공통 ============================== */
@@ -489,8 +496,8 @@ function viewLogin() {
   $app.innerHTML = `<section class="login"><div class="card login-card"><div class="login-logo">∫</div><h1>매일 꾸준히 <b>mathson</b></h1>
     <p class="muted" style="margin:8px 0 0">하루 7문제, 365일. 스스로 풀고, 해설로 확인하고, 개념으로 마무리해요.</p>
     <ol class="steps"><li><b>풀기</b><span>오늘의 7문제<br>하 2 · 중 3 · 상 2</span></li><li><b>채점</b><span>제출 즉시 채점<br>문항별 해설</span></li><li><b>정리</b><span>개념 한 장 읽고<br>학습 마무리</span></li></ol>
-    <button class="btn ghost" id="loginBtn" style="width:100%;padding:12px">${g} Google 계정으로 시작하기</button>
-    <p class="muted small">내 기록은 나만 볼 수 있어요.</p></div></section>`;
+    <button class="btn ghost" id="loginBtn" style="width:100%;padding:12px">${g} 학교 Google 계정으로 시작하기</button>
+    <p class="muted small">${CONFIG.allowedDomain ? `@${esc(CONFIG.allowedDomain)} 계정으로 로그인하세요. ` : ""}내 기록은 나만 볼 수 있어요.</p></div></section>`;
   document.getElementById("loginBtn").onclick = async () => { try { await S.be.signIn(); } catch (e) { toast("로그인하지 못했어요: " + (e.code || e.message)); } };
 }
 
