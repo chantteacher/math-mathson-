@@ -254,6 +254,7 @@ window.MathJax = { tex: { inlineMath: [["$", "$"]], displayMath: [["$$", "$$"]] 
    - claude.ai 아티팩트에서 열면 claude.ai 계정으로 저장됩니다.
    - 둘 다 아니면 이 브라우저에만 저장됩니다.
    ====================================================================== */
+const APP_VERSION = "2026.10.16-3";
 const CONFIG = {
   startDate: "2026-10-15",   // 1일차 날짜 (모든 학생 공통)
   totalDays: 365,
@@ -520,7 +521,7 @@ function viewLogin() {
     <p class="muted" style="margin:8px 0 0">하루 7문제, 365일.<br>스스로 풀고, 해설로 확인하고, 개념으로 마무리해요.</p>
     <ol class="steps"><li><b>풀기</b><span>오늘의 7문제<br>하 2 · 중 3 · 상 2</span></li><li><b>채점</b><span>제출 즉시 채점<br>문항별 해설</span></li><li><b>정리</b><span>개념 한 장 읽고<br>학습 마무리</span></li></ol>
     <button class="btn ghost" id="loginBtn" style="width:100%;padding:12px">${g} 학교 Google 계정으로 시작하기</button>
-    <p class="muted small">${CONFIG.allowedDomain ? `@${esc(CONFIG.allowedDomain)} 계정으로 로그인하세요.<br>` : ""}한 번 로그인하면 다음부터는 자동으로 들어가요.</p></div></section>`;
+    <p class="muted small">${CONFIG.allowedDomain ? `@${esc(CONFIG.allowedDomain)} 계정으로 로그인하세요.<br>` : ""}한 번 로그인하면 다음부터는 자동으로 들어가요.</p><p class="muted" style="font-size:11px;margin:10px 0 0;opacity:.6">버전 ${APP_VERSION}</p></div></section>`;
   document.getElementById("loginBtn").onclick = async () => { try { await S.be.signIn(); } catch (e) { toast("로그인하지 못했어요: " + (e.code || e.message)); } };
 }
 
