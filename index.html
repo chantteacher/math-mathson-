@@ -244,6 +244,21 @@ button.chip.more{color:var(--muted);border-style:dashed}.wconcept{margin-bottom:
 @media (max-width:380px){.brand{font-size:14px}.brand .logo{width:26px;height:26px;font-size:17px}.nav{padding:6px 5px}}
 @media (max-width:400px){.opt{width:40px;height:40px;font-size:18px}.steps{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.ig{display:grid;gap:12px;margin-top:6px}
+.ig-step{display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start}
+.ig-n{width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px}
+.ig-cap{font-size:14px;line-height:1.5;margin-bottom:6px}
+.ig-mock{border:1px solid rgba(127,127,127,.35);border-radius:12px;background:rgba(127,127,127,.08);padding:8px;font-size:13px}
+.ig-bar{display:flex;align-items:center;gap:8px}
+.ig-url{flex:1;min-width:0;background:var(--card);border-radius:8px;padding:6px 10px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ig-ic{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#888;flex:none}
+.ig-hot{background:#ffe08a;color:#1a1a1a;box-shadow:0 0 0 3px #ffb800;animation:igp 1.2s ease-in-out infinite}
+@keyframes igp{50%{box-shadow:0 0 0 7px rgba(255,184,0,.35)}}
+.ig-row{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;background:var(--card);margin-top:4px;color:#888}
+.ig-row.ig-hot{color:#1a1a1a;font-weight:700}
+.ig-arrow{position:fixed;z-index:60;top:calc(env(safe-area-inset-top,0px) + 4px);right:max(10px,env(safe-area-inset-right,0px));font-size:40px;line-height:1;color:#ffb800;text-shadow:0 2px 6px rgba(0,0,0,.5);animation:iga 1s ease-in-out infinite;pointer-events:none}
+.ig-arrow small{display:block;font-size:12px;color:#fff;background:#1a1a1a;border-radius:6px;padding:3px 6px;margin-top:2px;text-shadow:none;white-space:nowrap}
+@keyframes iga{50%{transform:translateY(-8px)}}
 </style>
 
 <div id="app"><div class="center muted">불러오는 중…</div></div>
@@ -260,7 +275,7 @@ window.MathJax = { tex: { inlineMath: [["$", "$"]], displayMath: [["$$", "$$"]] 
    - claude.ai 아티팩트에서 열면 claude.ai 계정으로 저장됩니다.
    - 둘 다 아니면 이 브라우저에만 저장됩니다.
    ====================================================================== */
-const APP_VERSION = "2026.10.16-10";
+const APP_VERSION = "2026.10.16-11";
 const CONFIG = {
   startDate: "2026-10-15",   // (예전 방식 기록용) 이제 1일차는 학생마다 처음 시작한 날이에요
   totalDays: 365,
@@ -320,9 +335,10 @@ async function saveFile(filename, data) {
 function ask(msg, ok = "확인", opt = {}) {
   return new Promise((res) => {
     const bg = document.createElement("div"); bg.className = "modal-bg";
-    bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h3>${esc(opt.title || "확인")}</h3><p style="margin:0;white-space:pre-line">${esc(msg)}</p><div class="modal-actions">${opt.noCancel ? "" : `<button class="btn ghost" data-a="no">취소</button>`}<button class="btn primary" data-a="yes">${esc(ok)}</button></div></div>`;
+    bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h3>${esc(opt.title || "확인")}</h3>${opt.html ? msg : `<p style="margin:0;white-space:pre-line">${esc(msg)}</p>`}<div class="modal-actions">${opt.noCancel ? "" : `<button class="btn ghost" data-a="no">취소</button>`}<button class="btn primary" data-a="yes">${esc(ok)}</button></div></div>`;
     document.body.appendChild(bg);
-    bg.querySelectorAll("button").forEach((b) => (b.onclick = () => { bg.remove(); if (b.dataset.a === "yes" && opt.onYes) opt.onYes(); res(b.dataset.a === "yes"); }));   // onYes 는 클릭 안에서 바로 실행(공유 창처럼 터치가 필요한 기능용)
+    if (opt.extra) document.body.insertAdjacentHTML("beforeend", opt.extra);
+    bg.querySelectorAll("button").forEach((b) => (b.onclick = () => { bg.remove(); document.querySelectorAll(".ig-arrow").forEach((x) => x.remove()); if (b.dataset.a === "yes" && opt.onYes) opt.onYes(); res(b.dataset.a === "yes"); }));   // onYes 는 클릭 안에서 바로 실행(공유 창처럼 터치가 필요한 기능용)
   });
 }
 
@@ -544,20 +560,25 @@ async function doInstall() {
     ask("이 기기에는 mathson 앱이 이미 설치되어 있어요.\n홈 화면(또는 앱 목록)의 mathson 아이콘으로 열면 돼요.\n\n다시 설치해 보고 싶다면\n1. 먼저 설치된 mathson 앱을 삭제하세요.\n   (휴대폰: 아이콘 길게 누르기 → 삭제 / 컴퓨터: 앱을 열고 오른쪽 위 ⋮ → 제거)\n2. 이 페이지를 새로고침한 뒤 '설치'를 다시 누르세요.\n\n※ 브라우저는 이미 설치된 앱의 설치 창을 다시 띄워 주지 않아요.", "알겠어요", { title: "이미 설치되어 있어요", noCancel: true });
     return;
   }
-  if (PWA.ios && !window.claude && navigator.share && !/KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\//i.test(navigator.userAgent)) { iosInstall(); return; }
+  if (PWA.ios && !window.claude && !/KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\//i.test(navigator.userAgent)) { iosInstall(); return; }
   const [gt, gm] = installGuide(); ask(gm, "알겠어요", { title: gt, noCancel: true });
 }
-// 아이패드·아이폰: 애플은 웹페이지가 스스로 홈 화면에 아이콘을 만드는 것을 허용하지 않는다.
-// 그래서 '확인'을 누르면 공유 창을 바로 열어, 학생은 '홈 화면에 추가' → '추가' 두 번만 누르면 되게 한다.
+// 아이패드·아이폰: 애플은 웹페이지가 스스로 홈 화면에 아이콘을 만들거나 Safari 공유 메뉴를 대신 열어 주는 것을 허용하지 않는다.
+// (페이지가 여는 공유 창에는 '홈 화면에 추가'가 없다.) 그래서 실제 화면과 똑같이 그린 그림으로 어디를 누를지 바로 보여 준다.
 function iosInstall() {
-  const dev = PWA.ipad ? "아이패드" : "아이폰";
-  const fallback = () => { const [gt, gm] = installGuide(); ask(gm, "알겠어요", { title: gt, noCancel: true }); };
-  ask(`${dev} 홈 화면에 mathson 앱을 설치할까요?\n\n'확인'을 누르면 공유 창이 열려요.\n① '홈 화면에 추가'를 누르고\n② 오른쪽 위 '추가'를 누르면 끝!\n\n(목록이 짧으면 아래로 내려 보세요.)`, "확인", { title: `${dev}에 앱 설치`,
-    onYes: () => {
-      navigator.share({ title: "매일 꾸준히 mathson", url: location.origin + location.pathname })
-        .then(() => toast("홈 화면에 mathson 아이콘이 생겼는지 확인해 보세요. 그 아이콘으로 열면 앱처럼 열려요."))
-        .catch((e) => { if (!e || e.name !== "AbortError") fallback(); else toast("공유 창에 '홈 화면에 추가'가 안 보였다면 주소창 오른쪽 위 공유 버튼(□↑)에서 찾아 주세요."); });
-    } });
+  const dev = PWA.ipad ? "아이패드" : "아이폰", other = /CriOS|EdgiOS|FxiOS|Whale/i.test(navigator.userAgent);
+  const shareSvg = `<svg width="18" height="20" viewBox="0 0 18 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7H3.5A1.5 1.5 0 0 0 2 8.5v9A1.5 1.5 0 0 0 3.5 19h11a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 7H12"/><path d="M9 1v12M5.5 4.5 9 1l3.5 3.5"/></svg>`;
+  const where = PWA.ipad ? "화면 오른쪽 위, 주소창 옆" : "화면 아래쪽 막대(또는 주소창 옆)";
+  const html = `<div class="ig">
+    <div class="ig-step"><div class="ig-n">1</div><div><div class="ig-cap"><b>${where}</b>의 <b>공유 버튼</b>을 누르세요.<br><span class="muted small">안 보이면 <b>⋯</b> 버튼을 누른 뒤 '공유'를 누르세요.</span></div>
+      <div class="ig-mock ig-bar"><div class="ig-url">🔒 ${esc(location.host || "mathson")}</div><div class="ig-ic ig-hot">${shareSvg}</div><div class="ig-ic">⋯</div></div></div></div>
+    <div class="ig-step"><div class="ig-n">2</div><div><div class="ig-cap">메뉴를 <b>아래로 내려</b> <b>'홈 화면에 추가'</b>를 누르세요.</div>
+      <div class="ig-mock"><div class="ig-row"><span>복사</span><span>⧉</span></div><div class="ig-row"><span>책갈피 추가</span><span>📖</span></div><div class="ig-row ig-hot"><span>홈 화면에 추가</span><span>⊞</span></div></div></div></div>
+    <div class="ig-step"><div class="ig-n">3</div><div><div class="ig-cap">오른쪽 위 <b>'추가'</b>를 누르면 끝!</div>
+      <div class="ig-mock ig-bar" style="justify-content:space-between"><span style="color:#888;padding:0 6px">취소</span><b>홈 화면에 추가</b><span class="ig-ic ig-hot" style="width:auto;padding:0 12px;font-weight:700">추가</span></div></div></div>
+    <p class="muted small" style="margin:2px 0 0">홈 화면에 생긴 <b>mathson</b> 아이콘으로 열면 앱처럼 열려요. 처음 한 번만 다시 로그인해 주세요.${other ? "<br>메뉴에 '홈 화면에 추가'가 없으면 Safari로 이 주소를 열어 주세요." : ""}</p></div>`;
+  const arrow = PWA.ipad ? `<div class="ig-arrow" aria-hidden="true">⬆<small>이쯤에 공유 버튼</small></div>` : "";
+  ask(html, "알겠어요", { title: `${dev}에 앱 설치`, noCancel: true, html: true, extra: arrow });
 }
 function topbar() {
   return `<header class="topbar"><button class="brand" data-go="home"><span class="logo">∫</span><span class="bt">매일 꾸준히 <b>mathson</b></span></button>
