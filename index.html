@@ -244,6 +244,9 @@ button.chip.more{color:var(--muted);border-style:dashed}.wconcept{margin-bottom:
 @media (max-width:380px){.brand{font-size:14px}.brand .logo{width:26px;height:26px;font-size:17px}.nav{padding:6px 5px}}
 @media (max-width:400px){.opt{width:40px;height:40px;font-size:18px}.steps{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.scope-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.scope-line .chips{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:0}
+.scope-line .chip{font-size:13px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--soft);color:var(--fg);white-space:nowrap}
 .ig{display:grid;gap:12px;margin-top:6px}
 .ig-step{display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start}
 .ig-n{width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px}
@@ -275,7 +278,7 @@ window.MathJax = { tex: { inlineMath: [["$", "$"]], displayMath: [["$$", "$$"]] 
    - claude.ai 아티팩트에서 열면 claude.ai 계정으로 저장됩니다.
    - 둘 다 아니면 이 브라우저에만 저장됩니다.
    ====================================================================== */
-const APP_VERSION = "2026.10.16-11";
+const APP_VERSION = "2026.10.16-12";
 const CONFIG = {
   startDate: "2026-10-15",   // (예전 방식 기록용) 이제 1일차는 학생마다 처음 시작한 날이에요
   totalDays: 365,
@@ -803,6 +806,32 @@ async function viewDay(n) {
   if (r) return viewResult(n, probs, r);
   viewSolve(n, probs);
 }
+// 문제지를 연 뒤에도(제출 전이라면) 출제 범위를 다시 골라 새 문제지를 볼 수 있다.
+function changeScope(n, answeredKey) {
+  let pick = S.sel.slice();
+  const bg = document.createElement("div"); bg.className = "modal-bg";
+  const draw = () => {
+    bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><h3>출제 범위 다시 고르기</h3>
+    <p class="muted small" style="margin:0 0 10px">문제를 풀 과목을 눌러 고른 뒤 '이 범위로 다시 보기'를 누르세요.</p>
+    <div class="scope-btns">${UNITS.map((u) => `<button class="sbtn ${pick.includes(u) ? "on" : ""}" data-u="${esc(u)}" aria-pressed="${pick.includes(u)}">${pick.includes(u) ? "✓ " : ""}${esc(uname(u))}</button>`).join("")}</div>
+    ${answeredKey ? `<p class="small" style="margin:12px 0 0;color:var(--warn)">※ 지금까지 고른 답은 지워지고 새 문제지로 바뀌어요.</p>` : ""}
+    <p class="muted small" style="margin:8px 0 0">바꾼 범위는 다음 날 문제에도 그대로 적용돼요. (이미 푼 날의 문제는 바뀌지 않아요.)</p>
+    <div class="modal-actions"><button class="btn ghost" data-a="no">취소</button><button class="btn primary" data-a="yes">이 범위로 다시 보기</button></div></div>`;
+  };
+  draw(); document.body.appendChild(bg);
+  bg.addEventListener("click", async (e) => {
+    const t = e.target.closest("[data-u]");
+    if (t) { const u = t.dataset.u, on = pick.includes(u); if (on && pick.length === 1) { toast("한 과목 이상은 골라야 해요."); return; } pick = on ? pick.filter((x) => x !== u) : UNITS.filter((x) => x === u || pick.includes(x)); draw(); return; }
+    const a = e.target.closest("[data-a]"); if (!a) return;
+    bg.remove(); if (a.dataset.a !== "yes") return;
+    if (JSON.stringify(pick) === JSON.stringify(S.sel)) { toast("범위가 그대로예요."); return; }
+    S.sel = pick; lsSet(`mathson_${S.user.uid}_sel`, S.sel); S.rec.sel = S.sel;
+    if (answeredKey) lsSet(answeredKey, null);
+    stopSession(); await viewDay(n); window.scrollTo(0, 0);
+    toast(`출제 범위를 바꿨어요: ${S.sel.map(uname).join(" · ")}`);
+    try { await S.be.saveSel(S.sel); } catch { }
+  });
+}
 function stopSession() { const s = S.sess; if (!s) return; clearInterval(s.timer); ["blur", "focus", "pagehide"].forEach((ev) => window.removeEventListener(ev, s.tick)); document.removeEventListener("visibilitychange", s.tick); s.obs && s.obs.disconnect(); S.sess = null; }
 function viewSolve(n, probs) {
   const key = `mathson_sess_${S.user.uid}_${dayKey(n)}`, ids = probs.map((p) => p.id);
@@ -812,9 +841,10 @@ function viewSolve(n, probs) {
   lsSet(key, ss);
   $app.innerHTML = `${topbar()}<div class="solvebar"><div class="sb"><b>Day ${n}</b>${n < todayNo() ? `<span class="tag warn">지난 날짜 · 늦게 푼 날로 기록</span>` : ""}<span class="clock" id="clock">00:00</span></div>
   <div class="sb"><span class="muted small" id="prog"></span></div><div class="sb"><button class="btn ghost sm" id="pdfBtn">PDF</button><button class="btn primary sm" id="submitBtn">제출</button></div></div>
-  <main class="wrap sheet-wrap"><p class="muted small" style="margin:4px 0 12px">연습장에 직접 풀고 답을 고르세요. 제출하면 바로 채점되고 해설이 열려요.</p>${sheetHTML(n, probs, { mode: "solve", answers: ss.answers })}</main>`;
+  <main class="wrap sheet-wrap"><div class="scope-line"><span class="muted small" style="white-space:nowrap">출제 범위</span><span class="chips">${S.sel.map((u) => `<span class="chip">${esc(uname(u))}</span>`).join("")}</span><button class="btn ghost sm" id="scopeBtn">범위 바꾸기</button></div><p class="muted small" style="margin:4px 0 12px">연습장에 직접 풀고 답을 고르세요. 제출하면 바로 채점되고 해설이 열려요.</p>${sheetHTML(n, probs, { mode: "solve", answers: ss.answers })}</main>`;
   bindTop();
   const sheet = document.getElementById("sheet"); typeset(sheet);
+  document.getElementById("scopeBtn").onclick = () => changeScope(n, ss.answers.some((x) => x != null) ? key : null);
   const prog = () => { const el = document.getElementById("prog"); if (el) el.textContent = `${ss.answers.filter((x) => x != null).length} / ${ids.length} 답함`; }; prog();
   sheet.addEventListener("click", (e) => {
     const c = e.target.closest(".prob"); if (c) ss.active = Number(c.dataset.i);
