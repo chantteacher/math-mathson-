@@ -260,7 +260,7 @@ window.MathJax = { tex: { inlineMath: [["$", "$"]], displayMath: [["$$", "$$"]] 
    - claude.ai 아티팩트에서 열면 claude.ai 계정으로 저장됩니다.
    - 둘 다 아니면 이 브라우저에만 저장됩니다.
    ====================================================================== */
-const APP_VERSION = "2026.10.16-5";
+const APP_VERSION = "2026.10.16-8";
 const CONFIG = {
   startDate: "2026-10-15",   // (예전 방식 기록용) 이제 1일차는 학생마다 처음 시작한 날이에요
   totalDays: 365,
@@ -512,8 +512,8 @@ function onGlobalClick(e) { const t = e.target.closest("[data-sel]"); if (t) { e
 const PWA = { prompt: null, standalone: matchMedia("(display-mode: standalone)").matches || navigator.standalone === true,
   ios: /iphone|ipad|ipod/i.test(navigator.userAgent), canSW: "serviceWorker" in navigator && location.protocol === "https:" && !window.claude };
 if (PWA.canSW) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
-addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); PWA.prompt = e; refreshInstall(); });
-addEventListener("appinstalled", () => { PWA.prompt = null; PWA.standalone = true; refreshInstall(); });
+addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); PWA.prompt = e; lsSet("mathson_installed", false); refreshInstall(); });   // 설치 창이 다시 뜰 수 있으면 = 지금은 설치 안 된 상태
+addEventListener("appinstalled", () => { PWA.prompt = null; lsSet("mathson_installed", true); toast("설치됐어요! 홈 화면(앱 목록)의 mathson 아이콘으로 열어 보세요."); refreshInstall(); });
 const showInstall = () => !PWA.standalone;   // 앱으로 열려 있지 않으면 늘 보인다
 function refreshInstall() { const b = document.getElementById("instBtn"); if (b) b.hidden = !showInstall(); }
 function installGuide() {
@@ -522,17 +522,25 @@ function installGuide() {
   if (/KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\//i.test(ua)) return "카카오톡·네이버 같은 앱 안에서 연 화면에서는 설치할 수 없어요.\n\n오른쪽 위(또는 아래) 메뉴에서 '다른 브라우저로 열기'를 누른 뒤\nChrome(안드로이드) 또는 Safari(아이폰)에서 다시 눌러 주세요.";
   if (PWA.ios) return "아이폰·아이패드 (Safari)\n\n1. 아래쪽 공유 버튼(□↑)을 누르세요.\n2. '홈 화면에 추가'를 누르세요.\n3. 오른쪽 위 '추가'를 누르면 mathson 아이콘이 생겨요.\n\nSafari가 아니면 Safari로 이 주소를 열어 주세요.";
   if (/SamsungBrowser/i.test(ua)) return "삼성 인터넷\n\n1. 아래쪽 메뉴(≡)를 누르세요.\n2. '현재 페이지 추가' → '홈 화면'을 누르세요.";
-  if (/Android/i.test(ua)) return "안드로이드 (Chrome)\n\n1. 오른쪽 위 ⋮ 메뉴를 누르세요.\n2. '앱 설치' 또는 '홈 화면에 추가'를 누르세요.";
-  return "컴퓨터 (Chrome·Edge)\n\n주소창 오른쪽의 설치 아이콘(⊕)을 누르거나,\n메뉴(⋮)에서 '앱 설치' 또는 '페이지를 앱으로 설치'를 누르세요.";
+  const again = "\n\n※ 이미 설치했다면 설치 창이 다시 뜨지 않아요. 바탕화면·시작 메뉴·앱 목록의 mathson 아이콘으로 열면 돼요. 다시 설치하려면 먼저 앱을 삭제한 뒤 이 페이지를 새로고침하세요.";
+  if (/Android/i.test(ua)) return "안드로이드 (Chrome)\n\n1. 오른쪽 위 ⋮ 메뉴를 누르세요.\n2. '앱 설치' 또는 '홈 화면에 추가'를 누르세요." + again;
+  return "컴퓨터 (Chrome·Edge)\n\n주소창 오른쪽의 설치 아이콘(⊕)을 누르거나,\n메뉴(⋮)에서 '앱 설치' 또는 '페이지를 앱으로 설치'를 누르세요." + again;
 }
 async function doInstall() {
-  if (PWA.prompt) { PWA.prompt.prompt(); await PWA.prompt.userChoice.catch(() => {}); PWA.prompt = null; refreshInstall(); return; }
+  if (PWA.prompt) { PWA.prompt.prompt(); const c = await PWA.prompt.userChoice.catch(() => null); PWA.prompt = null; if (c && c.outcome === "accepted") lsSet("mathson_installed", true); refreshInstall(); return; }
+  let installed = lsGet("mathson_installed", false);
+  try { if (!installed && navigator.getInstalledRelatedApps) installed = (await navigator.getInstalledRelatedApps()).length > 0; } catch { }
+  if (installed) lsSet("mathson_installed", true);
+  if (installed && !PWA.ios && !window.claude) {
+    ask("이 기기에는 mathson 앱이 이미 설치되어 있어요.\n홈 화면(또는 앱 목록)의 mathson 아이콘으로 열면 돼요.\n\n다시 설치해 보고 싶다면\n1. 먼저 설치된 mathson 앱을 삭제하세요.\n   (휴대폰: 아이콘 길게 누르기 → 삭제 / 컴퓨터: 앱을 열고 오른쪽 위 ⋮ → 제거)\n2. 이 페이지를 새로고침한 뒤 '설치'를 다시 누르세요.\n\n※ 브라우저는 이미 설치된 앱의 설치 창을 다시 띄워 주지 않아요.", "알겠어요", { title: "이미 설치되어 있어요", noCancel: true });
+    return;
+  }
   ask(installGuide(), "알겠어요", { title: "홈 화면에 mathson 설치", noCancel: true });
 }
 function topbar() {
   return `<header class="topbar"><button class="brand" data-go="home"><span class="logo">∫</span><span class="bt">매일 꾸준히 <b>mathson</b></span></button>
   <nav><button class="nav inst" id="instBtn" ${showInstall() ? "" : "hidden"} aria-label="앱으로 설치">⬇ <span class="hide-s">앱 </span>설치</button><button class="nav ${S.view === "home" ? "on" : ""}" data-go="home"><span class="hide-s">내 </span>학습</button><button class="nav ${S.view === "wrong" ? "on" : ""}" data-go="wrong">오답<span class="hide-s"> 노트</span></button>
-  ${S.be.mode === "firebase" ? `<button class="nav" id="outBtn">로그아웃</button>` : ""}</nav></header>${S.be.note ? `<div class="banner">${esc(S.be.note)}</div>` : ""}`;
+  ${S.be.mode === "firebase" ? `<button class="nav" id="outBtn" aria-label="로그아웃" title="로그아웃">⏻<span class="hide-s"> 로그아웃</span></button>` : ""}</nav></header>${S.be.note ? `<div class="banner">${esc(S.be.note)}</div>` : ""}`;
 }
 function bindTop() { const o = document.getElementById("outBtn"); if (o) o.onclick = () => S.be.signOut(); const i = document.getElementById("instBtn"); if (i) i.onclick = doInstall; }
 
@@ -543,7 +551,8 @@ function viewLogin() {
     <p class="muted" style="margin:8px 0 0">하루 7문제, 365일.<br>스스로 풀고, 해설로 확인하고, 개념으로 마무리해요.</p>
     <ol class="steps"><li><b>풀기</b><span>오늘의 7문제<br>하 2 · 중 3 · 상 2</span></li><li><b>채점</b><span>제출 즉시 채점<br>문항별 해설</span></li><li><b>정리</b><span>개념 한 장 읽고<br>학습 마무리</span></li></ol>
     <button class="btn ghost" id="loginBtn" style="width:100%;padding:12px">${g} 학교 Google 계정으로 시작하기</button>
-    <p class="muted small">${CONFIG.allowedDomain ? `@${esc(CONFIG.allowedDomain)} 계정으로 로그인하세요.<br>` : ""}한 번 로그인하면 다음부터는 자동으로 들어가요.</p><p class="muted" style="font-size:11px;margin:10px 0 0;opacity:.6">버전 ${APP_VERSION}</p></div></section>`;
+    <p class="muted small">${CONFIG.allowedDomain ? `@${esc(CONFIG.allowedDomain)} 계정으로 로그인하세요.<br>` : ""}한 번 로그인하면 다음부터는 자동으로 들어가요.</p>${showInstall() ? `<button class="btn ghost sm" id="instBtn2" style="margin-top:10px">⬇ 휴대폰에 앱으로 설치</button>` : ""}<p class="muted" style="font-size:11px;margin:10px 0 0;opacity:.6">버전 ${APP_VERSION}</p></div></section>`;
+  const ib = document.getElementById("instBtn2"); if (ib) ib.onclick = doInstall;
   document.getElementById("loginBtn").onclick = async () => { try { await S.be.signIn(); } catch (e) { toast("로그인하지 못했어요: " + (e.code || e.message)); } };
 }
 
